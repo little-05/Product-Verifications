@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Product Verification</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f2f2f2;
+      padding: 30px;
+    }
+    .card {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      max-width: 450px;
+      margin: auto;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    .result {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 10px;
+      font-size: 18px;
+    }
+    .valid { background: #d4edda; color: #155724; }
+    .invalid { background: #f8d7da; color: #721c24; }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <h2>QR Product Verification</h2>
+
+  <label>Enter Product ID:</label><br>
+  <input id="pid" type="text" placeholder="Scan or type product ID" style="width:100%;padding:10px;margin-top:10px">
+
+  <button onclick="verifyProduct()" style="margin-top:15px;padding:10px 15px;">Verify</button>
+
+  <div id="output"></div>
+</div>
+
+<script>
+  const sheetURL = "https://opensheet.elk.sh/YOUR_SHEET_ID/YOUR_SHEET_NAME";
+
+  async function verifyProduct() {
+    const pid = document.getElementById("pid").value.trim();
+    const output = document.getElementById("output");
+
+    if (!pid) {
+      output.innerHTML = "<p>Please enter product ID</p>";
+      return;
+    }
+
+    const res = await fetch(sheetURL);
+    const data = await res.json();
+
+    const product = data.find(p => p.productID === pid);
+
+    if (!product) {
+      output.innerHTML = `<div class='result invalid'>❌ Product Not Found!</div>`;
+      return;
+    }
+
+    output.innerHTML = `
+      <div class='result ${product.Status === "Valid" ? "valid" : "invalid"}'>
+        <b>Product ID:</b> ${product.productID}<br>
+        <b>Name:</b> ${product["Product name"]}<br>
+        <b>Batch:</b> ${product.Batch}<br>
+        <b>MFG Date:</b> ${product["MFG date"]}<br>
+        <b>EXP Date:</b> ${product["EXP date"]}<br>
+        <b>Status:</b> ${product.Status}
+      </div>
+    `;
+  }
+</script>
+
+</body>
+</html>
