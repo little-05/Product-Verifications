@@ -3,75 +3,128 @@
 <head>
   <title>Product Verification</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f2f2f2;
-      padding: 30px;
+    body { 
+      font-family: Arial, sans-serif; 
+      padding: 20px; 
+      background: #f8f8f8;
     }
     .card {
-      background: white;
+      background: #fff;
+      border: 1px solid #ccc;
       padding: 20px;
       border-radius: 10px;
-      max-width: 450px;
-      margin: auto;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      max-width: 400px;
     }
-    .result {
-      margin-top: 20px;
-      padding: 15px;
-      border-radius: 10px;
+    .title {
+      font-size: 22px;
+      font-weight: bold;
+    }
+    .error {
+      color: red;
       font-size: 18px;
     }
-    .valid { background: #d4edda; color: #155724; }
-    .invalid { background: #f8d7da; color: #721c24; }
   </style>
 </head>
 <body>
 
-<div class="card">
-  <h2>QR Product Verification</h2>
-
-  <label>Enter Product ID:</label><br>
-  <input id="pid" type="text" placeholder="Scan or type product ID" style="width:100%;padding:10px;margin-top:10px">
-
-  <button onclick="verifyProduct()" style="margin-top:15px;padding:10px 15px;">Verify</button>
-
-  <div id="output"></div>
-</div>
+<h2 class="title">Product Verification</h2>
+<div id="result">Loading...</div>
 
 <script>
-  const sheetURL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8Wv2XV--hyJK1ny3D5NiII-3vtotKAnbgmQ9ZoDxQto8r-PCWLM49hGM4dOip8tOupf_ue57GszdB/pub?gid=0&single=true&output=csv";
+  // Read ID from QR URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const productID = urlParams.get("id");
 
-  async function verifyProduct() {
-    const pid = document.getElementById("pid").value.trim();
-    const output = document.getElementById("output");
+  if (!productID) {
+    document.getElementById("result").innerHTML =
+      '<p class="error">Missing Product ID in URL. Format → product.html?id=PRD001</p>';
+  }
 
-    if (!pid) {
-      output.innerHTML = "<p>Please enter product ID</p>";
-      return;
+  // ------------------------------
+  // MAIN GOOGLE SHEET CSV LINK
+  // ------------------------------
+  const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8Wv2XV--hyJK1ny3D5NiII-3vtotKAnbgmQ9ZoDxQto8r-PCWLM49hGM4dOip8tOupf_ue57GszdB/pub?gid=0&single=true&output=csv"; 
+  // IMPORTANT: This must be *CSV Export* link
+
+  // ------------------------------
+  // FALLBACK JSON FILE
+  // ------------------------------
+  const JSON_FALLBACK = "products.json";
+
+  async function loadProducts() {
+    // FIRST TRY GOOGLE SHEET
+    try {
+      console.log("Trying Google Sheet CSV...");
+
+      const res = await fetch(CSV_URL);
+      if (!res.ok) throw new Error("Google Sheet not reachable");
+
+      const csv = await res.text();
+      const rows = csv.trim().split("\n").map(r => r.split(","));
+      const headers = rows[0];
+
+      const data = rows.slice(1).map(row => {
+        let obj = {};
+        headers.forEach((h, i) => {
+          obj[h.trim()] = row[i] ? row[i].trim() : "";
+        });
+        return obj;
+      });
+
+      console.log("Loaded from Google Sheet");
+      return data;
+
+    } catch (err) {
+      console.warn("Google Sheet FAILED → Using fallback JSON...");
+
+      // NOW TRY JSON FILE
+      try {
+        const res = await fetch(JSON_FALLBACK);
+        if (!res.ok) throw new Error("JSON not found");
+
+        const json = await res.json();
+        console.log("Loaded from products.json");
+        return json;
+
+      } catch (err2) {
+        document.getElementById("result").innerHTML =
+          '<p class="error">Error: Unable to load product database.</p>';
+
+        return [];
+      }
     }
+  }
 
-    const res = await fetch(sheetURL);
-    const data = await res.json();
+  // After data loads...
+  loadProducts().then(products => {
 
-    const product = data.find(p => p.productID === pid);
+    // SUPPORT BOTH COLUMN TYPES:
+    // Sheet might use ProductID, JSON might use id
+    const product = products.find(p =>
+      p.ProductID === productID || p.id === productID
+    );
 
     if (!product) {
-      output.innerHTML = `<div class='result invalid'>❌ Product Not Found!</div>`;
+      document.getElementById("result").innerHTML =
+        '<p class="error">❌ Invalid Product — No matching data found.</p>';
       return;
     }
 
-    output.innerHTML = `
-      <div class='result ${product.Status === "Valid" ? "valid" : "invalid"}'>
-        <b>Product ID:</b> ${product.productID}<br>
-        <b>Name:</b> ${product["Product name"]}<br>
-        <b>Batch:</b> ${product.Batch}<br>
-        <b>MFG Date:</b> ${product["MFG date"]}<br>
-        <b>EXP Date:</b> ${product["EXP date"]}<br>
-        <b>Status:</b> ${product.Status}
+    // Support both formats
+    const pid   = product.ProductID || product.id;
+    const name  = product.ProductName || product.name;
+    const desc  = product.Description || product.description;
+    const status = product.Status || (product.valid ? "Valid" : "Invalid");
+
+    document.getElementById("result").innerHTML = `
+      <div class="card">
+        <p><strong>Product ID:</strong> ${pid}</p>
+        <p><strong>Name:</strong> ${name}</p>
+        <p><strong>Description:</strong> ${desc}</p>
+        <p><strong>Status:</strong> ${status}</p>
       </div>
     `;
-  }
+  });
 </script>
 
 </body>
