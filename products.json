@@ -1,0 +1,18 @@
+[
+  {
+    "ProductID": "PRD001",
+    "ProductName": "Demo Product",
+    "Batch": "2",
+    "MFGDate": "01/01/2000",
+    "EXPDate": "uhwuvih",
+    "Status": "Valid"
+  },
+  {
+    "ProductID": "PRD002",
+    "ProductName": "Dummy",
+    "Batch": "2",
+    "MFGDate": "01/01/2000",
+    "EXPDate": "wvio",
+    "Status": "Not valid"
+  }
+]
