@@ -3,185 +3,139 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Product Verification</title>
+<title>QR Product Verification</title>
+
+<!-- QR Scanner Library -->
+<script src="https://unpkg.com/html5-qrcode"></script>
 
 <style>
   body {
     font-family: Arial, sans-serif;
-    background: #f2f2f2;
-    padding: 15px;
-  }
-
-  .container {
-    max-width: 450px;
-    margin: auto;
-  }
-
-  h2 {
-    text-align: center;
-    margin-bottom: 20px;
-  }
-
-  .card {
-    background: #fff;
+    background: #f5f5f5;
     padding: 20px;
-    border-radius: 12px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-    margin-top: 15px;
-  }
-
-  input {
-    width: 100%;
-    padding: 12px;
-    border-radius: 8px;
-    border: 1px solid #ccc;
-    margin-bottom: 10px;
-  }
-
-  button {
-    width: 100%;
-    padding: 12px;
-    background: #007bff;
-    border: none;
-    border-radius: 8px;
-    color: white;
-    font-size: 16px;
-  }
-
-  #reader {
-    width: 100%;
-    margin-top: 15px;
-  }
-
-  .error {
-    color: red;
-    font-weight: bold;
     text-align: center;
+  }
+  .card {
+    background: white;
+    padding: 15px;
+    margin-top: 20px;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    text-align: left;
+  }
+  input {
+    width: 90%;
+    padding: 10px;
+    margin-top: 10px;
+    border-radius: 8px;
+    border: 1px solid #bbb;
+  }
+  button {
+    margin-top: 10px;
+    padding: 12px 20px;
+    border: none;
+    background: #007bff;
+    color: white;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  button:active {
+    background: #0056b3;
+  }
+  #reader {
+    margin-top: 20px;
   }
 </style>
-
-<!-- QR Scanner Library -->
-<script src="https://unpkg.com/html5-qrcode"></script>
 </head>
 
 <body>
-<div class="container">
 
-  <h2>Product Verification</h2>
+<h2>Product Verification</h2>
 
-  <!-- Manual search -->
-  <input type="text" id="manualID" placeholder="Enter Product ID (e.g., PRD001)">
-  <button onclick="verifyManual()">Verify Product</button>
+<!-- Manual Input -->
+<input type="text" id="manualInput" placeholder="Enter Product ID">
+<button onclick="manualSearch()">Search</button>
 
-  <h3 style="text-align:center;">OR</h3>
+<!-- QR Scanner -->
+<div id="reader" style="width: 300px;"></div>
 
-  <!-- QR Scanner -->
-  <div id="reader"></div>
-
-  <div id="result"></div>
-
-</div>
+<!-- Result -->
+<div id="result"></div>
 
 <script>
-  // ---------------------------
-  //     CONFIG
-  // ---------------------------
-  const CSV_LINK = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8Wv2XV--hyJK1ny3D5NiII-3vtotKAnbgmQ9ZoDxQto8r-PCWLM49hGM4dOip8tOupf_ue57GszdB/pubhtml?gid=0&single=true"; // Replace with your Google Sheet CSV link
-  const JSON_FALLBACK = "products.json";
-
-  // ---------------------------
-  // LOAD FROM GOOGLE SHEET CSV
-  // ---------------------------
-  async function loadFromSheet() {
-    const res = await fetch(CSV_LINK);
-    if (!res.ok) throw new Error("Sheet unavailable");
-
-    const text = await res.text();
-    const lines = text.trim().split("\n");
-    const headers = lines[0].split(",");
-
-    let data = [];
-    for (let i = 1; i < lines.length; i++) {
-      let row = lines[i].split(",");
-      let obj = {};
-      headers.forEach((h, index) => {
-        obj[h.trim()] = row[index] ? row[index].trim() : "";
-      });
-      data.push(obj);
-    }
-    return data;
+// ---------------------------------------
+//  JSON DATA (Your product list)
+// ---------------------------------------
+const productData = [
+  {
+    "ProductID": "PRD001",
+    "ProductName": "Demo Product",
+    "Batch": "2",
+    "MFGDate": "01/01/2000",
+    "EXPDate": "uhwuvih",
+    "Status": "Valid"
+  },
+  {
+    "ProductID": "PRD002",
+    "ProductName": "Dummy",
+    "Batch": "2",
+    "MFGDate": "01/01/2000",
+    "EXPDate": "wvio",
+    "Status": "Not valid"
   }
+];
 
-  // ---------------------------
-  // LOAD FROM JSON
-  // ---------------------------
-  async function loadFromJSON() {
-    const res = await fetch(JSON_FALLBACK);
-    if (!res.ok) throw new Error("JSON missing");
-    return res.json();
-  }
+// ---------------------------------------
+// Display Product Details
+// ---------------------------------------
+function showProduct(product) {
+  document.getElementById("result").innerHTML = `
+    <div class="card">
+      <p><b>Product ID:</b> ${product.ProductID}</p>
+      <p><b>Name:</b> ${product.ProductName}</p>
+      <p><b>Batch:</b> ${product.Batch}</p>
+      <p><b>MFG Date:</b> ${product.MFGDate}</p>
+      <p><b>EXP Date:</b> ${product.EXPDate}</p>
+      <p><b>Status:</b> ${product.Status}</p>
+    </div>
+  `;
+}
 
-  // ---------------------------
-  // AUTO LOAD (with fallback)
-  // ---------------------------
-  async function loadData() {
-    try {
-      return await loadFromSheet();
-    } catch (e) {
-      console.log("Sheet failed → using JSON fallback");
-      return loadFromJSON();
-    }
-  }
+// ---------------------------------------
+// Manual Search
+// ---------------------------------------
+function manualSearch() {
+  let pid = document.getElementById("manualInput").value.trim();
+  let match = productData.find(p => p.ProductID === pid);
 
-  // ---------------------------
-  // DISPLAY PRODUCT DETAILS
-  // ---------------------------
-  function showProduct(product) {
-    document.getElementById("result").innerHTML = `
-      <div class="card">
-        <p><b>Product ID:</b> ${product.ProductID}</p>
-        <p><b>Name:</b> ${product.ProductName}</p>
-        <p><b>Batch:</b> ${product.Batch}</p>
-        <p><b>MFG Date:</b> ${product.MFGDate}</p>
-        <p><b>EXP Date:</b> ${product.EXPDate}</p>
-        <p><b>Status:</b> ${product.Status}</p>
-      </div>
-    `;
-  }
-
-  function showError(msg) {
+  if (match) {
+    showProduct(match);
+  } else {
     document.getElementById("result").innerHTML =
-      `<p class="error">${msg}</p>`;
+      `<p style='color:red;'>❌ No product found</p>`;
   }
+}
 
-  // ---------------------------
-  // VERIFY MANUAL INPUT
-  // ---------------------------
-  async function verifyManual() {
-    const id = document.getElementById("manualID").value.trim();
-    if (!id) return showError("Please enter a Product ID.");
+// ---------------------------------------
+// QR Scanner
+// ---------------------------------------
+function onScanSuccess(decodedText) {
+  let match = productData.find(p => p.ProductID === decodedText);
 
-    const data = await loadData();
-    const product = data.find(p => p.ProductID === id);
-
-    if (!product) return showError("Invalid Product — Not Found");
-    showProduct(product);
+  if (match) {
+    showProduct(match);
+  } else {
+    document.getElementById("result").innerHTML =
+      `<p style='color:red;'>❌ Invalid Product</p>`;
   }
+}
 
-  // ---------------------------
-  // QR SCANNER
-  // ---------------------------
-  function onScanSuccess(decodedText) {
-    document.getElementById("manualID").value = decodedText;
-    verifyManual();
-  }
-
-  const html5QrcodeScanner = new Html5QrcodeScanner(
-    "reader",
-    { fps: 10, qrbox: 200 }
-  );
-
-  html5QrcodeScanner.render(onScanSuccess);
+// Start Scanner
+const scanner = new Html5QrcodeScanner("reader", {
+  fps: 10,
+  qrbox: 200
+});
+scanner.render(onScanSuccess);
 </script>
 
 </body>
