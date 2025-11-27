@@ -3,127 +3,120 @@
 <head>
   <title>Product Verification</title>
   <style>
-    body { 
-      font-family: Arial, sans-serif; 
-      padding: 20px; 
-      background: #f8f8f8;
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: #f2f2f2;
     }
     .card {
       background: #fff;
-      border: 1px solid #ccc;
       padding: 20px;
       border-radius: 10px;
-      max-width: 400px;
-    }
-    .title {
-      font-size: 22px;
-      font-weight: bold;
+      border: 1px solid #ccc;
+      max-width: 450px;
     }
     .error {
       color: red;
       font-size: 18px;
+      font-weight: bold;
     }
   </style>
 </head>
 <body>
 
-<h2 class="title">Product Verification</h2>
-<div id="result">Loading....</div>
+<h2>Product Verification</h2>
+<div id="result">Loading...</div>
 
 <script>
-  // Read ID from QR URL
   const urlParams = new URLSearchParams(window.location.search);
   const productID = urlParams.get("id");
 
   if (!productID) {
     document.getElementById("result").innerHTML =
-      '<p class="error">Missing Product ID in URL. Format → product.html?id=PRD001</p>';
+      '<p class="error">❌ Product ID missing. Use: product.html?id=PRD001</p>';
   }
 
-  // ------------------------------
+  // --------------------------
   // MAIN GOOGLE SHEET CSV LINK
-  // ------------------------------
-  const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8Wv2XV--hyJK1ny3D5NiII-3vtotKAnbgmQ9ZoDxQto8r-PCWLM49hGM4dOip8tOupf_ue57GszdB/pub?gid=0&single=true&output=csv"; 
-  // IMPORTANT: This must be *CSV Export* link
+  // --------------------------
+  const CSV_LINK = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8Wv2XV--hyJK1ny3D5NiII-3vtotKAnbgmQ9ZoDxQto8r-PCWLM49hGM4dOip8tOupf_ue57GszdB/pub?gid=0&single=true&output=csv"; 
+  // Example: https://docs.google.com/spreadsheets/d/XXXXX/export?format=csv
 
-  // ------------------------------
-  // FALLBACK JSON FILE
-  // ------------------------------
+  // --------------------------
+  // JSON FALLBACK
+  // --------------------------
   const JSON_FALLBACK = "products.json";
 
-  async function loadProducts() {
-    // FIRST TRY GOOGLE SHEET
-    try {
-      console.log("Trying Google Sheet CSV...");
+  async function loadFromSheet() {
+    const res = await fetch(CSV_LINK);
+    if (!res.ok) throw new Error("Sheet error");
 
-      const res = await fetch(CSV_URL);
-      if (!res.ok) throw new Error("Google Sheet not reachable");
+    const csv = await res.text();
+    const lines = csv.trim().split("\n");
 
-      const csv = await res.text();
-      const rows = csv.trim().split("\n").map(r => r.split(","));
-      const headers = rows[0];
+    const headers = lines[0].split(",");
+    const data = [];
 
-      const data = rows.slice(1).map(row => {
-        let obj = {};
-        headers.forEach((h, i) => {
-          obj[h.trim()] = row[i] ? row[i].trim() : "";
-        });
-        return obj;
+    for (let i = 1; i < lines.length; i++) {
+      let row = lines[i].split(",");
+      let obj = {};
+      headers.forEach((h, idx) => {
+        obj[h.trim()] = row[idx] ? row[idx].trim() : "";
       });
+      data.push(obj);
+    }
 
-      console.log("Loaded from Google Sheet");
-      return data;
+    return data;
+  }
 
+  async function loadFromJSON() {
+    const res = await fetch(JSON_FALLBACK);
+    if (!res.ok) throw new Error("JSON not found");
+    return res.json();
+  }
+
+  async function loadData() {
+    try {
+      console.log("Trying Google Sheet…");
+      return await loadFromSheet();
     } catch (err) {
-      console.warn("Google Sheet FAILED → Using fallback JSON...");
-
-      // NOW TRY JSON FILE
+      console.log("Sheet failed. Switching to JSON fallback…");
       try {
-        const res = await fetch(JSON_FALLBACK);
-        if (!res.ok) throw new Error("JSON not found");
-
-        const json = await res.json();
-        console.log("Loaded from products.json");
-        return json;
-
+        return await loadFromJSON();
       } catch (err2) {
         document.getElementById("result").innerHTML =
-          '<p class="error">Error: Unable to load product database.</p>';
-
+          '<p class="error">❌ Cannot load product data.</p>';
         return [];
       }
     }
   }
 
-  // After data loads...
-  loadProducts().then(products => {
-
-    // SUPPORT BOTH COLUMN TYPES:
-    // Sheet might use ProductID, JSON might use id
-    const product = products.find(p =>
+  // MAIN EXECUTION
+  loadData().then(data => {
+    const product = data.find(p =>
       p.ProductID === productID || p.id === productID
     );
 
     if (!product) {
       document.getElementById("result").innerHTML =
-        '<p class="error">❌ Invalid Product — No matching data found.</p>';
+        '<p class="error">❌ Invalid Product — Not Found</p>';
       return;
     }
 
-    // Support both formats
-    const pid   = product.ProductID || product.id;
-    const name  = product.ProductName || product.name;
-    const desc  = product.Description || product.description;
+    // Compatible with sheet + JSON
+    const pid = product.ProductID || product.id;
+    const name = product.ProductName || product.name;
+    const desc = product.Description || product.description;
     const status = product.Status || (product.valid ? "Valid" : "Invalid");
 
-    document.getElementById("result").innerHTML = '
+    document.getElementById("result").innerHTML = `
       <div class="card">
-        <p><strong>Product ID:</strong> ${pid}</p>
-        <p><strong>Name:</strong> ${name}</p>
-        <p><strong>Description:</strong> ${desc}</p>
-        <p><strong>Status:</strong> ${status}</p>
+        <p><b>Product ID:</b> ${pid}</p>
+        <p><b>Name:</b> ${name}</p>
+        <p><b>Description:</b> ${desc}</p>
+        <p><b>Status:</b> ${status}</p>
       </div>
-    ';
+    `;
   });
 </script>
 
