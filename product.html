@@ -151,7 +151,7 @@
 
   function showError(msg) {
     document.getElementById("result").innerHTML =
-      `<p class="error">${msg}</p>`;
+      '<p class="error">${msg}</p>';
   }
 
   // ---------------------------
@@ -164,7 +164,7 @@
     const data = await loadData();
     const product = data.find(p => p.ProductID === id);
 
-    if (!product) return showError("❌ Invalid Product — Not Found");
+    if (!product) return showError("Invalid Product — Not Found");
     showProduct(product);
   }
 
