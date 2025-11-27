@@ -1,123 +1,187 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Product Verification</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      padding: 20px;
-      background: #f2f2f2;
-    }
-    .card {
-      background: #fff;
-      padding: 20px;
-      border-radius: 10px;
-      border: 1px solid #ccc;
-      max-width: 450px;
-    }
-    .error {
-      color: red;
-      font-size: 18px;
-      font-weight: bold;
-    }
-  </style>
-</head>
-<body>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Product Verification</title>
 
-<h2>Product Verification</h2>
-<div id="result">Loading...</div>
-
-<script>
-  const urlParams = new URLSearchParams(window.location.search);
-  const productID = urlParams.get("id");
-
-  if (!productID) {
-    document.getElementById("result").innerHTML =
-      '<p class="error">❌ Product ID missing. Use: product.html?id=PRD001</p>';
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #f2f2f2;
+    padding: 15px;
   }
 
-  // --------------------------
-  // MAIN GOOGLE SHEET CSV LINK
-  // --------------------------
-  const CSV_LINK = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8Wv2XV--hyJK1ny3D5NiII-3vtotKAnbgmQ9ZoDxQto8r-PCWLM49hGM4dOip8tOupf_ue57GszdB/pub?gid=0&single=true&output=csv"; 
-  // Example: https://docs.google.com/spreadsheets/d/XXXXX/export?format=csv
+  .container {
+    max-width: 450px;
+    margin: auto;
+  }
 
-  // --------------------------
-  // JSON FALLBACK
-  // --------------------------
+  h2 {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+
+  .card {
+    background: #fff;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    margin-top: 15px;
+  }
+
+  input {
+    width: 100%;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    margin-bottom: 10px;
+  }
+
+  button {
+    width: 100%;
+    padding: 12px;
+    background: #007bff;
+    border: none;
+    border-radius: 8px;
+    color: white;
+    font-size: 16px;
+  }
+
+  #reader {
+    width: 100%;
+    margin-top: 15px;
+  }
+
+  .error {
+    color: red;
+    font-weight: bold;
+    text-align: center;
+  }
+</style>
+
+<!-- QR Scanner Library -->
+<script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+
+<body>
+<div class="container">
+
+  <h2>Product Verification</h2>
+
+  <!-- Manual search -->
+  <input type="text" id="manualID" placeholder="Enter Product ID (e.g., PRD001)">
+  <button onclick="verifyManual()">Verify Product</button>
+
+  <h3 style="text-align:center;">OR</h3>
+
+  <!-- QR Scanner -->
+  <div id="reader"></div>
+
+  <div id="result"></div>
+
+</div>
+
+<script>
+  // ---------------------------
+  //     CONFIG
+  // ---------------------------
+  const CSV_LINK = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ8Wv2XV--hyJK1ny3D5NiII-3vtotKAnbgmQ9ZoDxQto8r-PCWLM49hGM4dOip8tOupf_ue57GszdB/pubhtml?gid=0&single=true"; // Replace with your Google Sheet CSV link
   const JSON_FALLBACK = "products.json";
 
+  // ---------------------------
+  // LOAD FROM GOOGLE SHEET CSV
+  // ---------------------------
   async function loadFromSheet() {
     const res = await fetch(CSV_LINK);
-    if (!res.ok) throw new Error("Sheet error");
+    if (!res.ok) throw new Error("Sheet unavailable");
 
-    const csv = await res.text();
-    const lines = csv.trim().split("\n");
-
+    const text = await res.text();
+    const lines = text.trim().split("\n");
     const headers = lines[0].split(",");
-    const data = [];
 
+    let data = [];
     for (let i = 1; i < lines.length; i++) {
       let row = lines[i].split(",");
       let obj = {};
-      headers.forEach((h, idx) => {
-        obj[h.trim()] = row[idx] ? row[idx].trim() : "";
+      headers.forEach((h, index) => {
+        obj[h.trim()] = row[index] ? row[index].trim() : "";
       });
       data.push(obj);
     }
-
     return data;
   }
 
+  // ---------------------------
+  // LOAD FROM JSON
+  // ---------------------------
   async function loadFromJSON() {
     const res = await fetch(JSON_FALLBACK);
-    if (!res.ok) throw new Error("JSON not found");
+    if (!res.ok) throw new Error("JSON missing");
     return res.json();
   }
 
+  // ---------------------------
+  // AUTO LOAD (with fallback)
+  // ---------------------------
   async function loadData() {
     try {
-      console.log("Trying Google Sheet…");
       return await loadFromSheet();
-    } catch (err) {
-      console.log("Sheet failed. Switching to JSON fallback…");
-      try {
-        return await loadFromJSON();
-      } catch (err2) {
-        document.getElementById("result").innerHTML =
-          '<p class="error">❌ Cannot load product data.</p>';
-        return [];
-      }
+    } catch (e) {
+      console.log("Sheet failed → using JSON fallback");
+      return loadFromJSON();
     }
   }
 
-  // MAIN EXECUTION
-  loadData().then(data => {
-    const product = data.find(p =>
-      p.ProductID === productID || p.id === productID
-    );
-
-    if (!product) {
-      document.getElementById("result").innerHTML =
-        '<p class="error">❌ Invalid Product — Not Found</p>';
-      return;
-    }
-
-    // Compatible with sheet + JSON
-    const pid = product.ProductID || product.id;
-    const name = product.ProductName || product.name;
-    const desc = product.Description || product.description;
-    const status = product.Status || (product.valid ? "Valid" : "Invalid");
-
+  // ---------------------------
+  // DISPLAY PRODUCT DETAILS
+  // ---------------------------
+  function showProduct(product) {
     document.getElementById("result").innerHTML = `
       <div class="card">
-        <p><b>Product ID:</b> ${pid}</p>
-        <p><b>Name:</b> ${name}</p>
-        <p><b>Description:</b> ${desc}</p>
-        <p><b>Status:</b> ${status}</p>
+        <p><b>Product ID:</b> ${product.ProductID}</p>
+        <p><b>Name:</b> ${product.ProductName}</p>
+        <p><b>Batch:</b> ${product.Batch}</p>
+        <p><b>MFG Date:</b> ${product.MFGDate}</p>
+        <p><b>EXP Date:</b> ${product.EXPDate}</p>
+        <p><b>Status:</b> ${product.Status}</p>
       </div>
     `;
-  });
+  }
+
+  function showError(msg) {
+    document.getElementById("result").innerHTML =
+      `<p class="error">${msg}</p>`;
+  }
+
+  // ---------------------------
+  // VERIFY MANUAL INPUT
+  // ---------------------------
+  async function verifyManual() {
+    const id = document.getElementById("manualID").value.trim();
+    if (!id) return showError("Please enter a Product ID.");
+
+    const data = await loadData();
+    const product = data.find(p => p.ProductID === id);
+
+    if (!product) return showError("❌ Invalid Product — Not Found");
+    showProduct(product);
+  }
+
+  // ---------------------------
+  // QR SCANNER
+  // ---------------------------
+  function onScanSuccess(decodedText) {
+    document.getElementById("manualID").value = decodedText;
+    verifyManual();
+  }
+
+  const html5QrcodeScanner = new Html5QrcodeScanner(
+    "reader",
+    { fps: 10, qrbox: 200 }
+  );
+
+  html5QrcodeScanner.render(onScanSuccess);
 </script>
 
 </body>
