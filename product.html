@@ -1,141 +1,203 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>QR Product Verification</title>
-
-<!-- QR Scanner Library -->
 <script src="https://unpkg.com/html5-qrcode"></script>
+
+<!-- Google Material Icons -->
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 
 <style>
   body {
-    font-family: Arial, sans-serif;
-    background: #f5f5f5;
+    font-family: "Roboto", Arial, sans-serif;
+    background: #f2f4f8;
     padding: 20px;
+    margin: 0;
+  }
+
+  h2 {
     text-align: center;
+    font-weight: 600;
+    color: #2c3e50;
   }
-  .card {
-    background: white;
-    padding: 15px;
-    margin-top: 20px;
-    border-radius: 10px;
-    box-shadow: 0 0 10px rgba(0,0,0,0.1);
-    text-align: left;
+
+  .container {
+    max-width: 480px;
+    margin: auto;
   }
+
   input {
-    width: 90%;
-    padding: 10px;
-    margin-top: 10px;
-    border-radius: 8px;
-    border: 1px solid #bbb;
+    width: 100%;
+    padding: 14px;
+    margin-top: 12px;
+    border-radius: 10px;
+    border: 1px solid #ccc;
+    font-size: 16px;
+    outline: none;
   }
+
   button {
-    margin-top: 10px;
-    padding: 12px 20px;
+    width: 100%;
+    padding: 14px;
+    margin-top: 12px;
     border: none;
-    background: #007bff;
+    background: #1976d2;
     color: white;
-    border-radius: 8px;
+    font-size: 16px;
+    border-radius: 10px;
     cursor: pointer;
   }
+
   button:active {
-    background: #0056b3;
+    opacity: 0.8;
   }
+
+  .card {
+    background: white;
+    padding: 20px;
+    margin-top: 25px;
+    border-radius: 16px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+  }
+
+  .info-row {
+    margin: 6px 0;
+    font-size: 16px;
+  }
+
+  .status-badge {
+    padding: 6px 10px;
+    border-radius: 8px;
+    color: white;
+    font-weight: bold;
+    display: inline-block;
+    margin-left: 8px;
+  }
+
+  .valid {
+    background: #2ecc71;
+  }
+
+  .invalid {
+    background: #e74c3c;
+  }
+
   #reader {
     margin-top: 20px;
+    border-radius: 10px;
+    overflow: hidden;
   }
+
+  .scan-again {
+    background: #27ae60 !important;
+  }
+
 </style>
 </head>
 
 <body>
 
-<h2>Product Verification</h2>
+<div class="container">
+  <h2>Product Verification</h2>
 
-<!-- Manual Input -->
-<input type="text" id="manualInput" placeholder="Enter Product ID">
-<button onclick="manualSearch()">Search</button>
+  <input type="text" id="manualInput" placeholder="Enter Product ID">
+  <button onclick="manualSearch()">
+    <span class="material-icons" style="vertical-align: middle;">search</span> Search
+  </button>
 
-<!-- QR Scanner -->
-<div id="reader" style="width: 300px;"></div>
+  <div id="reader" style="width:100%;"></div>
 
-<!-- Result -->
-<div id="result"></div>
+  <button id="scanAgainBtn" class="scan-again" style="display:none;" onclick="restartScanner()">
+    <span class="material-icons" style="vertical-align: middle;">qr_code_scanner</span> Scan Again
+  </button>
+
+  <div id="result"></div>
+</div>
 
 <script>
-// ---------------------------------------
-//  JSON DATA (Your product list)
-// ---------------------------------------
-const productData = [
-  {
-    "ProductID": "PRD001",
-    "ProductName": "Demo Product",
-    "Batch": "2",
-    "MFGDate": "01/01/2000",
-    "EXPDate": "uhwuvih",
-    "Status": "Valid"
-  },
-  {
-    "ProductID": "PRD002",
-    "ProductName": "Dummy",
-    "Batch": "2",
-    "MFGDate": "01/01/2000",
-    "EXPDate": "wvio",
-    "Status": "Not valid"
-  }
-];
+let productList = [];
+let scanner;
 
-// ---------------------------------------
-// Display Product Details
-// ---------------------------------------
+// Load JSON from external file
+fetch("products.json")
+  .then(res => res.json())
+  .then(data => {
+    productList = data;
+    console.log("JSON Loaded:", productList);
+  })
+  .catch(err => console.error("JSON load error:", err));
+
+
+// Show product card
 function showProduct(product) {
+  let statusColor = product.Status.toLowerCase() === "valid" ? "valid" : "invalid";
+
   document.getElementById("result").innerHTML = `
     <div class="card">
-      <p><b>Product ID:</b> ${product.ProductID}</p>
-      <p><b>Name:</b> ${product.ProductName}</p>
-      <p><b>Batch:</b> ${product.Batch}</p>
-      <p><b>MFG Date:</b> ${product.MFGDate}</p>
-      <p><b>EXP Date:</b> ${product.EXPDate}</p>
-      <p><b>Status:</b> ${product.Status}</p>
+      <div class="info-row"><b>Product ID:</b> ${product.ProductID}</div>
+      <div class="info-row"><b>Name:</b> ${product.ProductName}</div>
+      <div class="info-row"><b>Batch:</b> ${product.Batch}</div>
+      <div class="info-row"><b>MFG Date:</b> ${product.MFGDate}</div>
+      <div class="info-row"><b>EXP Date:</b> ${product.EXPDate}</div>
+      <div class="info-row">
+        <b>Status:</b>
+        <span class="status-badge ${statusColor}">${product.Status}</span>
+      </div>
     </div>
   `;
+
+  document.getElementById("scanAgainBtn").style.display = "block";
 }
 
-// ---------------------------------------
+
 // Manual Search
-// ---------------------------------------
 function manualSearch() {
   let pid = document.getElementById("manualInput").value.trim();
-  let match = productData.find(p => p.ProductID === pid);
+
+  let match = productList.find(p => p.ProductID === pid);
 
   if (match) {
     showProduct(match);
   } else {
     document.getElementById("result").innerHTML =
-      `<p style='color:red;'>❌ No product found</p>`;
+      `<p style="color:red; margin-top:20px;">❌ No product found</p>`;
   }
 }
 
-// ---------------------------------------
-// QR Scanner
-// ---------------------------------------
+
+// QR Success
 function onScanSuccess(decodedText) {
-  let match = productData.find(p => p.ProductID === decodedText);
+  let match = productList.find(p => p.ProductID === decodedText);
 
   if (match) {
     showProduct(match);
   } else {
     document.getElementById("result").innerHTML =
-      `<p style='color:red;'>❌ Invalid Product</p>`;
+      `<p style="color:red; margin-top:20px;">❌ Invalid Product</p>`;
   }
+
+  scanner.clear();
+  document.getElementById("scanAgainBtn").style.display = "block";
 }
 
-// Start Scanner
-const scanner = new Html5QrcodeScanner("reader", {
+
+// Start QR Scanner
+scanner = new Html5QrcodeScanner("reader", {
   fps: 10,
-  qrbox: 200
+  qrbox: 250
 });
 scanner.render(onScanSuccess);
+
+
+// Restart scanner
+function restartScanner() {
+  document.getElementById("result").innerHTML = "";
+  document.getElementById("scanAgainBtn").style.display = "none";
+  scanner.render(onScanSuccess);
+}
 </script>
 
 </body>
