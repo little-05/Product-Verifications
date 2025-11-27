@@ -116,14 +116,14 @@
     const desc  = product.Description || product.description;
     const status = product.Status || (product.valid ? "Valid" : "Invalid");
 
-    document.getElementById("result").innerHTML = `
+    document.getElementById("result").innerHTML = '
       <div class="card">
         <p><strong>Product ID:</strong> ${pid}</p>
         <p><strong>Name:</strong> ${name}</p>
         <p><strong>Description:</strong> ${desc}</p>
         <p><strong>Status:</strong> ${status}</p>
       </div>
-    `;
+    ';
   });
 </script>
 
